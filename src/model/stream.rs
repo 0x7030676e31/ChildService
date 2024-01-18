@@ -1,6 +1,8 @@
-use super::user::User;
+use super::user::ToStrUser;
+use super::report::Report;
 
 use std::task::{Context, Poll};
+use std::collections::HashMap;
 
 use pin_project_lite::pin_project;
 use futures::ready;
@@ -14,10 +16,15 @@ use serde::Serialize;
 #[serde(tag = "type", content = "payload")]
 pub enum StreamPayload<'a> {
   Ready {
-    reports: &'a Vec<String>,
-    threads: &'a Vec<String>,
-    user: &'a User,
+    user: ToStrUser<'a>,
+    reports: Vec<&'a Report>,
+    nicknames: HashMap<&'a String, &'a String>, 
   },
+  ReadyAdmin {
+    id: &'a String,
+    users: Vec<ToStrUser<'a>>,
+    reports: &'a Vec<Report>,
+  }
 }
 
 pin_project! {

@@ -1,10 +1,9 @@
 use super::user::User;
-use super::thread::Thread;
 use super::report::Report;
 use super::stream;
-use crate::{ArcLock, AppState};
+use crate::AppState;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 use std::sync::OnceLock;
 use std::env;
 use std::time::Duration;
@@ -29,26 +28,19 @@ fn path() -> &'static str {
   })
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct State {
-  pub users: HashMap<String, ArcLock<User>>,
-  pub threads: Vec<ArcLock<Thread>>,
-  pub reports: Vec<ArcLock<Report>>,
-  pub listeners: Vec<(mpsc::Sender<Bytes>, String)>,
-}
+  pub users: HashMap<String, User>,
+  pub reports: Vec<Report>,
 
-#[derive(Deserialize)]
-struct FromStrState {
-  users: HashMap<String, User>,
-  threads: Vec<Thread>,
-  reports: Vec<Report>,
+  #[serde(skip)]
+  pub listeners: Vec<(mpsc::Sender<Bytes>, String)>,
 }
 
 #[derive(Serialize)]
 struct ToStrState<'a> {
-  users: HashMap<String, &'a User>,
-  threads: Vec<&'a Thread>,
-  reports: Vec<&'a Report>,
+  users: &'a HashMap<String, User>,
+  reports: &'a Vec<Report>,
 }
 
 const PING_INTERVAL: Duration = Duration::from_secs(15);
@@ -76,21 +68,16 @@ impl PingLoop for AppState {
 
 impl State {
   pub fn new() -> Self {
-    match std::fs::read_to_string(path()) {
+    match fs::read_to_string(path()) {
       Ok(file) => Self::from_str(&file),
       Err(_) => return State::default()
     }
   }
 
   fn from_str(file: &str) -> Self {
-    let state: FromStrState = serde_json::from_str(file).unwrap();
-    log::info!("Loaded state from file");
-
-    State {
-      users: state.users.into_iter().map(|(k, v)| (k, ArcLock(v))).collect(),
-      threads: state.threads.into_iter().map(|v| ArcLock(v)).collect(),
-      reports: state.reports.into_iter().map(|v| ArcLock(v)).collect(),
-      listeners: Vec::new(),
+    match serde_json::from_str(file) {
+      Ok(state) => state,
+      Err(err) => panic!("Error while parsing state: {}", err)
     }
   }
 
@@ -102,8 +89,16 @@ impl State {
     digest(token)
   }
 
-  pub async fn write(&self) {
-  
+  pub fn write(&self) {
+    let state = ToStrState {
+      users: &self.users,
+      reports: &self.reports,
+    };
+
+    let state = serde_json::to_string(&state).unwrap();
+    if let Err(err) = fs::write(path(), state) {
+      log::error!("Error while saving state to file: {}", err)
+    }
   }
 
   pub fn new_stream(&mut self, user_id: String) -> stream::InfallibleStream<ReceiverStream<Bytes>> {
@@ -115,7 +110,11 @@ impl State {
     });
 
     stream::InfallibleStream::new(ReceiverStream::new(rx))
-  } 
+  }
+
+  pub fn get_nicknames(&self) -> HashMap<&String, &String> {
+    self.users.values().map(|user| (&user.uuid, &user.username)).collect::<HashMap<_, _>>()
+  }
 
   pub async fn broadcast(&self, message: stream::StreamPayload<'_>) {
     let message = serde_json::to_string(&message).unwrap();

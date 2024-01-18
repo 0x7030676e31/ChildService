@@ -1,5 +1,4 @@
-use crate::model::user::User;
-use crate::{ArcLock, AppState};
+use crate::AppState;
 
 use std::pin::Pin;
 
@@ -7,8 +6,7 @@ use actix_web::{FromRequest, Error, HttpRequest, error, web};
 use actix_web::dev::Payload;
 use futures::Future;
 
-pub struct UserGuard(pub ArcLock<User>);
-
+pub struct UserGuard(pub String);
 
 impl FromRequest for UserGuard {
   type Error = Error;
@@ -38,12 +36,11 @@ impl FromRequest for UserGuard {
 
       
       let app_state = app_state.read().await;
-      match app_state.users.get(header) {
-        Some(user) => Ok(UserGuard(user.clone())),
-        None => {
-          log::warn!("Invalid authorization token. Request path: {}", path);
-          Err(error::ErrorForbidden(""))
-        },
+      if app_state.users.contains_key(header) {
+        Ok(UserGuard(header.to_owned()))
+      } else {
+        log::warn!("Invalid authorization token. Request path: {}", path);
+        Err(error::ErrorForbidden(""))
       }
     })
   }
