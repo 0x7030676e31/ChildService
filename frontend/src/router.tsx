@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 
 function random_id(): number {
   return Date.now() + Math.random() * 1000;
@@ -71,12 +71,12 @@ function setQuery(query: { [key: string]: string }) {
  * @returns The current location and query params
   */
 export function useLocation() {
-  const id = useRef(random_id());
+  const id = useMemo(() => random_id(), []);
   const [_, set] = useState(0);
 
   useEffect(() => {
-    listeners[id.current] = () => set(random_id());
-    return () => void delete listeners[id.current];
+    listeners[id] = () => set(random_id());
+    return () => void delete listeners[id];
   }, []);
 
   return state;
@@ -123,7 +123,7 @@ const pathParams: { [key: string]: { [key: string]: string } } = {};
   */
 export function useLocationParams() {
   const { provider } = useContext(ctx);
-  const id = useRef(random_id());
+  const id = useMemo(() => random_id(), []);
   const [_, set] = useState(0);
 
   useEffect(() => {
@@ -132,27 +132,27 @@ export function useLocationParams() {
     }
 
     pathListeners[provider] ??= {};
-    pathListeners[provider][id.current] = () => set(random_id());
-    return () => void delete pathListeners[id.current];
+    pathListeners[provider][id] = () => set(random_id());
+    return () => void delete pathListeners[id];
   }, []);
 
   return pathParams[provider] ?? {};
 }
 
-export function Routes({ children }: { children?: React.ReactNode }) {
+export function Routes({ children }: { readonly children?: React.ReactNode }) {
   const [component, setComponent] = useState<React.ReactNode>(null);
-  const id = useRef(random_id());
+  const id = useMemo(() => random_id(), []);
 
   function refresh() {
     const path = state.location.split("/").filter(Boolean);
     let params: { [key: string]: string } = {};
 
-    const match = routes[id.current].routes.find(([route]) => {
+    const match = routes[id].routes.find(([route]) => {
       params = {};
-      for (let i = 0; i < route.length; i++) {
+      for (let i = 0; i < Math.max(route.length, path.length); i++) {
         const part = route[i];
         const path_part = path[i];
-        if (!path_part && part.type !== "wildcard") return false;
+        if ((!path_part && part.type !== "wildcard") || (path_part && !part)) return false;
 
         if (part.type === "string") {
           if (part.value !== path_part) return false;
@@ -167,15 +167,15 @@ export function Routes({ children }: { children?: React.ReactNode }) {
       return true;
     });
 
-    const are_params_equal = Object.keys(params).length === Object.keys(pathParams[id.current] ?? {}).length && Object.entries(params).every(([key, value]) => pathParams[id.current]?.[key] === value);
+    const are_params_equal = Object.keys(params).length === Object.keys(pathParams[id] ?? {}).length && Object.entries(params).every(([key, value]) => pathParams[id]?.[key] === value);
     if (!are_params_equal) {
-      pathParams[id.current] = params;
-      Object.values(pathListeners[id.current] ?? {}).forEach(fn => fn());
+      pathParams[id] = params;
+      Object.values(pathListeners[id] ?? {}).forEach(fn => fn());
     }
 
     if (!match) {
-      if (routes[id.current].current_route !== -1) {
-        routes[id.current].current_route = -1;
+      if (routes[id].current_route !== -1) {
+        routes[id].current_route = -1;
         setComponent(null);
       }
 
@@ -183,25 +183,25 @@ export function Routes({ children }: { children?: React.ReactNode }) {
     }
     
     const [_, component, timestamp] = match;
-    if (routes[id.current].current_route !== timestamp) {
-      routes[id.current].current_route = timestamp;
+    if (routes[id].current_route !== timestamp) {
+      routes[id].current_route = timestamp;
       setComponent(component);
     }
   }
 
   useEffect(() => {
     refresh();
-    listeners[id.current] = refresh;
-    return () => void delete listeners[id.current];
+    listeners[id] = refresh;
+    return () => void delete listeners[id];
   }, [])
 
-  return <ctx.Provider value={{ provider: id.current }}>
+  return <ctx.Provider value={{ provider: id }}>
     {children}
     {component}
   </ctx.Provider>;
 }
 
-export function Route({ path, children }: { path: string, children?: React.ReactNode }) {
+export function Route({ path, children }: { readonly path: string, readonly children?: React.ReactNode }) {
   const { provider } = useContext(ctx);
   useEffect(() => {
     if (provider === 0) {

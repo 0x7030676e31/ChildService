@@ -36,7 +36,6 @@ pub async fn stream(state: web::Data<AppState>, token: UserGuard) -> impl Respon
   state.listeners.push((tx.clone(), token.0));
   
   tokio::spawn(async move {
-    println!("Sending payload to stream");
     if let Err(err) = tx.send(payload).await {
       log::error!("Error sending payload to stream: {}", err);
     }
