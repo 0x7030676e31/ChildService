@@ -30,6 +30,8 @@ async fn main() -> std::io::Result<()> {
     state.start_ping_loop();
 
     actix_web::App::new()
+      // .wrap(actix_web::middleware::Logger::default())    
+      .wrap(actix_cors::Cors::permissive())
       .app_data(Data::new(state))
       .service(routes::routes())
   });

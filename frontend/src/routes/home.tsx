@@ -2,5 +2,5 @@
 // import { useNavigation } from "../router";
 
 export default function Home() {
-  return <></>
+  return <>Test</>
 }

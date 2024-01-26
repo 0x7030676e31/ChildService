@@ -9,6 +9,7 @@ export default function App() {
   
   useEffect(() => {
     if (!window.localStorage.getItem("auth") && window.location.pathname !== "/login") {
+      console.log(Boolean(window.localStorage.getItem("auth")));
       setPath("/login");
     }
   }, []);

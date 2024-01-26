@@ -14,17 +14,20 @@ struct LoginCredentials {
 async fn register(state: web::Data<AppState>, body: web::Json<LoginCredentials>) -> HttpResponse {
   let mut state = state.write().await;
   
+  log::info!("Registering user \"{}\"", body.username);
+
   if state.users.values().any(|user| user.username == body.username) {
+    log::info!("User \"{}\" already exists", body.username);
     return HttpResponse::Conflict().finish();
   }
 
   let LoginCredentials { username, password } = body.into_inner();
-  log::info!("Registering user {}", username);
-  
+
+  log::info!("Creating user \"{}\"", username);
   let user = user::User::new(username, password);
   let token = State::generate_epicos_tokens();
   state.users.insert(token.clone(), user);
-  
+
   state.write();
   HttpResponse::Ok().body(token)
 }
@@ -37,8 +40,14 @@ async fn login(state: web::Data<AppState>, body: web::Json<LoginCredentials>) ->
   let user = state.users.iter().find(|(_, user)| user.username == username && user.password == password);
 
   match user {
-    Some((token, _)) => HttpResponse::Ok().body(token.clone()),
-    None => HttpResponse::Unauthorized().finish(),
+    Some((token, _)) => {
+      log::info!("User \"{}\" logged in", username);
+      HttpResponse::Ok().body(token.clone())
+    },
+    None => {
+      log::info!("User \"{}\" failed to log in", username);
+      HttpResponse::Unauthorized().finish()
+    },
   }
 }
 

@@ -14,7 +14,7 @@ window.addEventListener("popstate", () => {
 });
 
 function refresh() {
-  window.history.pushState({}, "", `${state.location}${state.query.size ? "?" : ""}${state.query.toString()}`);
+  window.history.pushState({}, "", `${state.location}${state.query.size ? "?" : ""}${state.query.toString()}` || "/");
   Object.values(listeners).forEach(fn => fn());
 }
 
