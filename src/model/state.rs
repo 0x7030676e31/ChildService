@@ -85,7 +85,7 @@ impl State {
     let timestamp = Utc::now().timestamp_millis();
     let token = format!("{:x}", timestamp);
 
-    log::info!("Generated new token from: {}", token);
+    log::debug!("Generated new token from: {}", token);
     digest(token)
   }
 
@@ -95,6 +95,7 @@ impl State {
       reports: &self.reports,
     };
 
+    log::debug!("Saving state to file...");
     let state = serde_json::to_string(&state).unwrap();
     if let Err(err) = fs::write(path(), state) {
       log::error!("Error while saving state to file: {}", err)
@@ -120,6 +121,7 @@ impl State {
     let message = serde_json::to_string(&message).unwrap();
     let message = Bytes::from(message);
   
+    log::debug!("Broadcasting message: {} to {} listeners", message.len(), self.listeners.len());
     for (listener, _) in &self.listeners {
       if listener.is_closed() {
         continue;
@@ -135,6 +137,7 @@ impl State {
     let message = serde_json::to_string(&message).unwrap();
     let message = Bytes::from(message);
   
+    log::debug!("Broadcasting message: {} to {}", message.len(), user_id);
     for (listener, id) in &self.listeners {
       if listener.is_closed() || id != user_id {
         continue;

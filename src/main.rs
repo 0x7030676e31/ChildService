@@ -20,19 +20,22 @@ const INNER_PORT: u16 = 2137;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-  env::set_var("RUST_LOG", "INFO");
+  if env::var("RUST_LOG").is_err() {
+    env::set_var("RUST_LOG", "info");
+  }
+  
   pretty_env_logger::init();
 
   log::info!("Starting server on port {}...", INNER_PORT);
 
-  let server = actix_web::HttpServer::new(move || {    
-    let state = Arc::new(RwLock::new(State::new()));
-    state.start_ping_loop();
-
+  let state = State::new();
+  let state = Arc::new(RwLock::new(state));
+  state.start_ping_loop();
+  
+  let server = actix_web::HttpServer::new(move || {
     actix_web::App::new()
-      // .wrap(actix_web::middleware::Logger::default())    
       .wrap(actix_cors::Cors::permissive())
-      .app_data(Data::new(state))
+      .app_data(Data::new(state.clone()))
       .service(routes::routes())
   });
 
