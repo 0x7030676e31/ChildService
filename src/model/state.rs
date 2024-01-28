@@ -1,6 +1,7 @@
 use super::user::User;
 use super::report::Report;
 use super::stream;
+use crate::model::stream::ChunkSender;
 use crate::AppState;
 
 use std::{collections::HashMap, fs};
@@ -127,7 +128,7 @@ impl State {
         continue;
       }
     
-      if let Err(err) = listener.send(message.clone()).await {
+      if let Err(err) = listener.send_chunk(message.clone()).await {
         log::error!("Error while sending message to listener: {}", err);
       }
     }
@@ -143,7 +144,7 @@ impl State {
         continue;
       }
     
-      if let Err(err) = listener.send(message.clone()).await {
+      if let Err(err) = listener.send_chunk(message.clone()).await {
         log::error!("Error while sending message to listener: {}", err);
       }
     }

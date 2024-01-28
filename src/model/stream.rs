@@ -9,6 +9,8 @@ use futures::ready;
 use futures::stream::Stream;
 use actix_web::{Responder, HttpResponse, web};
 use actix_web::body::{BoxBody, MessageBody, BodySize};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc;
 use tokio_stream::wrappers;
 use serde::Serialize;
 
@@ -83,3 +85,14 @@ impl MessageBody for InfallibleStream<wrappers::ReceiverStream<web::Bytes>> {
   }
 }
 
+pub trait ChunkSender<T> {
+  async fn send_chunk(&self, value: T) -> Result<(), SendError<T>>;
+}
+
+impl ChunkSender<web::Bytes> for mpsc::Sender<web::Bytes> {
+  async fn send_chunk(&self, value: web::Bytes) -> Result<(), SendError<web::Bytes>> {
+    let mut value = value.to_vec();
+    value.push(0x00);
+    self.send(web::Bytes::from(value)).await
+  }
+}

@@ -1,4 +1,4 @@
-use crate::model::stream::{InfallibleStream, StreamPayload};
+use crate::model::stream::{ChunkSender, InfallibleStream, StreamPayload};
 use crate::model::user::AccessLevel;
 use super::extractors::UserGuard;
 use crate::AppState;
@@ -7,6 +7,12 @@ use actix_web::web::Bytes;
 use actix_web::{get, web, Responder};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+
+#[derive(serde::Serialize, Debug)]
+struct TestPayload {
+  field: String,
+  big_data: Vec<u8>,
+}
 
 #[get("/stream")]
 pub async fn stream(state: web::Data<AppState>, token: UserGuard) -> impl Responder {
@@ -36,7 +42,7 @@ pub async fn stream(state: web::Data<AppState>, token: UserGuard) -> impl Respon
   state.listeners.push((tx.clone(), token.0));
   
   tokio::spawn(async move {
-    if let Err(err) = tx.send(payload).await {
+    if let Err(err) = tx.send_chunk(payload).await {
       log::error!("Error sending payload to stream: {}", err);
     }
   });
